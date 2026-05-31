@@ -43,7 +43,7 @@ This contrast is the main motivation for the teacher-guided design. For sub-bill
 
 ![Teacher-guided F2F eval summary](assets/f2f_eval_summary.png)
 
-On GSM8K eval, the best observed pilot accuracy was 36.5% for the base model, 47.0% for GRPO, 48.0% for unguided F2F, and 50.0% for Teacher-Guided F2F. The same runs also show why the best-number comparison is not the whole story: unguided F2F briefly improves but later collapses to 39.5%, while Teacher-Guided F2F keeps the best eval score in this pilot comparison.
+On GSM8K eval, the best observed pilot accuracy was 36.5% for the base model, 47.2% for GRPO, 48.7% for unguided F2F, and 51.5% for Teacher-Guided F2F. The same runs also show why the best-number comparison is not the whole story: unguided F2F briefly improves but later collapses from 48.7% to 39.5%, while Teacher-Guided F2F recovers +12.0 points over the collapsed F2F checkpoint and keeps the best eval score in this pilot comparison.
 
 ## Released Teacher-Correction Data
 
