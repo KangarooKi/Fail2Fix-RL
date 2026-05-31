@@ -23,6 +23,16 @@ RLVR on math tasks often reduces feedback to a sparse binary reward: the final a
 
 Fail2Fix-RL turns model-generated failures into training material. The student first solves the problem normally. Then selected candidate solutions are replayed as "possibly wrong" traces, and the student learns to check, preserve, or repair them.
 
+## Why Teacher Guidance Matters
+
+The teacher-guided stage was added because unguided self-correction is a poor cold start for very small models. In preliminary runs, the policy was asked to build correction prompts from its own rollouts and learn only from binary verifier feedback. The correction reward rose for a while, but then dropped sharply around the middle of training and stayed noisy instead of converging. The raw correction reward showed the same pattern: early improvement, followed by a severe decline and unstable oscillation.
+
+| Unguided correction reward | Unguided raw correction reward |
+| --- | --- |
+| ![Unguided correction reward mean](assets/unguided_correction_reward_mean.png) | ![Unguided correction raw reward mean](assets/unguided_correction_raw_reward_mean.png) |
+
+This failure mode is intuitive for sub-billion-parameter students. Their failed rollouts are often too noisy to serve as reliable teaching material; a binary verifier says whether the final answer is right, but not how the reasoning should be repaired; and correction prompts can accidentally teach over-editing, where the model changes answers that were already correct. Teacher-guided correction SFT gives the student a minimal correction prior before online RL: how to diagnose an error, when to preserve a valid solution, how to produce a verifier-friendly final answer, and how to turn a failed attempt into a fixed trajectory. Online F2F then continues with the student's own rollouts rather than depending on the teacher at every RL step.
+
 ## Core Method
 
 Each online RL step uses two streams:
