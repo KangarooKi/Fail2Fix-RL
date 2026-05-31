@@ -43,20 +43,20 @@ __pycache__/
 # One-off experiment scripts are kept local. The public repository only tracks
 # the reusable framework entrypoints.
 /run_phase_b_rollout.py
-/remote_scripts/analyze_gsm8k_rollout_errors.py
-/remote_scripts/build_cipo_replay.py
-/remote_scripts/eval_math500_bench.py
-/remote_scripts/eval_qwen25_*.py
-/remote_scripts/monitor_*.py
-/remote_scripts/prepare_dapo_grpo_data.py
-/remote_scripts/prepare_math500_sft_rl.py
-/remote_scripts/prepare_qwen_sft_subset.py
-/remote_scripts/run_*.sh
-/remote_scripts/train_cipo_grpo.py
-/remote_scripts/train_cipo_online_grpo.py
-/remote_scripts/train_cipo_online_teacher_grpo.py
-/remote_scripts/train_dapo_grpo_base.py
-/remote_scripts/train_qwen25_*.py
+/src/analyze_gsm8k_rollout_errors.py
+/src/build_cipo_replay.py
+/src/eval_math500_bench.py
+/src/eval_qwen25_*.py
+/src/monitor_*.py
+/src/prepare_dapo_grpo_data.py
+/src/prepare_math500_sft_rl.py
+/src/prepare_qwen_sft_subset.py
+/src/run_*.sh
+/src/train_cipo_grpo.py
+/src/train_cipo_online_grpo.py
+/src/train_cipo_online_teacher_grpo.py
+/src/train_dapo_grpo_base.py
+/src/train_qwen25_*.py
 
 # Large model artifacts
 *.bin

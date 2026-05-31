@@ -92,7 +92,7 @@ assets/
 released_data/
   mimo_teacher_corrections_gsm8k/   Verified Mimo correction SFT 数据。
 
-remote_scripts/
+src/
   prepare_gsm8k_grpo_data.py        将 ModelScope GSM8K 转成 RL JSONL。
   collect_student_rollouts.py       采样多条 student rollout。
   build_teacher_corrections.py      构造 verified teacher correction SFT 数据。
@@ -101,8 +101,8 @@ remote_scripts/
   train_grpo_base.py                Vanilla GRPO baseline。
   eval_gsm8k_subset.py              GSM8K 子集评测。
   eval_correction_sft.py            纠错 prompt 评测。
+  verifier_math.py                  数学答案抽取与等价比较。
 
-verifier_math.py                    数学答案抽取与等价比较。
 requirements.txt                    Python 依赖。
 ```
 
@@ -117,14 +117,14 @@ pip install -r requirements.txt
 准备 GSM8K：
 
 ```bash
-python remote_scripts/prepare_gsm8k_grpo_data.py \
+python src/prepare_gsm8k_grpo_data.py \
   --output-dir data/gsm8k_grpo
 ```
 
 采样学生模型 rollout：
 
 ```bash
-python remote_scripts/collect_student_rollouts.py \
+python src/collect_student_rollouts.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/gsm8k_grpo/train.jsonl \
   --output data/teacher_correction/student_rollouts_train.jsonl \
@@ -137,7 +137,7 @@ python remote_scripts/collect_student_rollouts.py \
 ```bash
 cp .env.example .env.teacher
 
-python remote_scripts/build_teacher_corrections.py \
+python src/build_teacher_corrections.py \
   --rollouts data/teacher_correction/student_rollouts_train.jsonl \
   --output data/teacher_correction/correction_sft_train.jsonl \
   --cache data/teacher_correction/teacher_cache.jsonl
@@ -146,7 +146,7 @@ python remote_scripts/build_teacher_corrections.py \
 运行 correction SFT：
 
 ```bash
-python remote_scripts/train_correction_sft.py \
+python src/train_correction_sft.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/teacher_correction/correction_sft_train.jsonl \
   --output-dir checkpoints/f2f_correction_sft
@@ -155,7 +155,7 @@ python remote_scripts/train_correction_sft.py \
 继续在线 F2F RL：
 
 ```bash
-python remote_scripts/train_f2f_online_rl.py \
+python src/train_f2f_online_rl.py \
   --model checkpoints/f2f_correction_sft \
   --train-data data/gsm8k_grpo/train.jsonl \
   --eval-data data/gsm8k_grpo/test.jsonl \
@@ -170,7 +170,7 @@ python remote_scripts/train_f2f_online_rl.py \
 运行 GRPO baseline：
 
 ```bash
-python remote_scripts/train_grpo_base.py \
+python src/train_grpo_base.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/gsm8k_grpo/train.jsonl \
   --output-dir checkpoints/grpo_base \
@@ -180,7 +180,7 @@ python remote_scripts/train_grpo_base.py \
 评测 checkpoint：
 
 ```bash
-python remote_scripts/eval_gsm8k_subset.py \
+python src/eval_gsm8k_subset.py \
   --model checkpoints/f2f_online/best_eval_checkpoint \
   --data data/gsm8k_grpo/test.jsonl \
   --limit 200 \

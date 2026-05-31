@@ -94,7 +94,7 @@ assets/
 released_data/
   mimo_teacher_corrections_gsm8k/   Verified Mimo correction SFT data.
 
-remote_scripts/
+src/
   prepare_gsm8k_grpo_data.py        Convert ModelScope GSM8K into RL JSONL.
   collect_student_rollouts.py       Generate multi-sample student rollouts.
   build_teacher_corrections.py      Build verified teacher correction SFT data.
@@ -103,8 +103,8 @@ remote_scripts/
   train_grpo_base.py                Vanilla GRPO baseline.
   eval_gsm8k_subset.py              Deterministic GSM8K subset evaluation.
   eval_correction_sft.py            Correction-prompt evaluation.
+  verifier_math.py                  Answer extraction and equivalence checks.
 
-verifier_math.py                    Answer extraction and equivalence checks.
 requirements.txt                    Python dependencies.
 ```
 
@@ -119,14 +119,14 @@ pip install -r requirements.txt
 Prepare GSM8K:
 
 ```bash
-python remote_scripts/prepare_gsm8k_grpo_data.py \
+python src/prepare_gsm8k_grpo_data.py \
   --output-dir data/gsm8k_grpo
 ```
 
 Collect student rollouts:
 
 ```bash
-python remote_scripts/collect_student_rollouts.py \
+python src/collect_student_rollouts.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/gsm8k_grpo/train.jsonl \
   --output data/teacher_correction/student_rollouts_train.jsonl \
@@ -139,7 +139,7 @@ Generate verified teacher corrections:
 ```bash
 cp .env.example .env.teacher
 
-python remote_scripts/build_teacher_corrections.py \
+python src/build_teacher_corrections.py \
   --rollouts data/teacher_correction/student_rollouts_train.jsonl \
   --output data/teacher_correction/correction_sft_train.jsonl \
   --cache data/teacher_correction/teacher_cache.jsonl
@@ -148,7 +148,7 @@ python remote_scripts/build_teacher_corrections.py \
 Run correction SFT:
 
 ```bash
-python remote_scripts/train_correction_sft.py \
+python src/train_correction_sft.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/teacher_correction/correction_sft_train.jsonl \
   --output-dir checkpoints/f2f_correction_sft
@@ -157,7 +157,7 @@ python remote_scripts/train_correction_sft.py \
 Continue with online F2F RL:
 
 ```bash
-python remote_scripts/train_f2f_online_rl.py \
+python src/train_f2f_online_rl.py \
   --model checkpoints/f2f_correction_sft \
   --train-data data/gsm8k_grpo/train.jsonl \
   --eval-data data/gsm8k_grpo/test.jsonl \
@@ -172,7 +172,7 @@ python remote_scripts/train_f2f_online_rl.py \
 Run the GRPO baseline:
 
 ```bash
-python remote_scripts/train_grpo_base.py \
+python src/train_grpo_base.py \
   --model Qwen/Qwen2.5-0.5B-Instruct \
   --data data/gsm8k_grpo/train.jsonl \
   --output-dir checkpoints/grpo_base \
@@ -182,7 +182,7 @@ python remote_scripts/train_grpo_base.py \
 Evaluate a checkpoint:
 
 ```bash
-python remote_scripts/eval_gsm8k_subset.py \
+python src/eval_gsm8k_subset.py \
   --model checkpoints/f2f_online/best_eval_checkpoint \
   --data data/gsm8k_grpo/test.jsonl \
   --limit 200 \
