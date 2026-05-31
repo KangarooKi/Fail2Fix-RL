@@ -4,7 +4,7 @@
 
 Fail2Fix-RL 是一个面向小模型数学推理的轻量级研究框架，用来训练模型从自己的失败 rollout 中学习纠错。当前实现围绕 GSM8K 风格可验证数学题、Qwen2.5-0.5B-Instruct 级别模型和单卡训练环境构建。
 
-项目受到 CIPO 等 correction-oriented RLVR 方法启发，但仓库代码按“可复现框架”组织，不包含临时实验脚本、阶段性日志或结果堆料。
+项目位于 self-improving language models、自蒸馏、纠偏学习和可验证奖励学习的交叉处。仓库代码按“可复现框架”组织，不包含临时实验脚本、阶段性日志或结果堆料。
 
 ## 框架图
 
@@ -151,6 +151,16 @@ python remote_scripts/eval_gsm8k_subset.py \
   --output-dir reports/eval_gsm8k
 ```
 
+## 相关工作
+
+Fail2Fix-RL 更接近自生成监督、自我纠偏和可验证奖励训练的交叉方向。
+
+**自生成数据与自蒸馏。** Self-Instruct 说明了语言模型可以生成 instruction 数据，再用于后续 instruction tuning（[Wang et al., 2022](https://arxiv.org/abs/2212.10560)）。Large Language Models Can Self-Improve 使用 unlabeled data 上高置信度的 chain-of-thought 样本作为自训练目标（[Huang et al., 2022](https://arxiv.org/abs/2210.11610)）。STaR 通过“生成 rationale、保留答案正确的 rationale、再 fine-tune”的循环来 bootstrap reasoning（[Zelikman et al., 2022](https://arxiv.org/abs/2203.14465)）。ReST-EM 把 generate-filter-finetune 扩展到带 scalar feedback 的数学和代码问题求解（[Singh et al., 2023](https://arxiv.org/abs/2312.06585)）。SPIN 将自我提升建模成与旧版本模型生成结果之间的 self-play fine-tuning（[Chen et al., 2024](https://arxiv.org/abs/2401.01335)）。Instruction Backtranslation 则从原始文本反向构造 instruction-response 数据，是另一类 self-alignment 路线（[Li et al., 2023](https://arxiv.org/abs/2308.06259)）。
+
+**自我纠偏与反馈驱动修正。** Self-Refine 在推理时通过 self-feedback 迭代改写输出，不直接更新模型权重（[Madaan et al., 2023](https://arxiv.org/abs/2303.17651)）。Reflexion 把任务反馈转成 verbal memory，用于下一轮 agent 尝试，尤其适合代码和决策任务（[Shinn et al., 2023](https://arxiv.org/abs/2303.11366)）。Let's Verify Step by Step 这类 process-supervision 工作说明，只看最终答案的 outcome supervision 对多步推理来说往往太粗，verifier 或 reward-model feedback 可以提供更细的学习信号（[Lightman et al., 2023](https://arxiv.org/abs/2305.20050)）。
+
+**Failure-to-fix RL。** Fail2Fix-RL 与纯 self-training 的区别在于，它会把学生模型自己的候选解答显式 replay 成纠错 prompt。教师纠错先给小模型一个 self-correction prior，在线 F2F RL 再持续从当前策略生成新的普通 rollout 和纠错 rollout。也有更直接面向 failure trajectory correction 的 RLVR 工作研究如何把失败轨迹转成纠错监督（[Ren et al., 2026](https://arxiv.org/abs/2605.14539)）；本仓库把这一路线作为背景，主要强调 teacher-guided F2F 的训练流程。
+
 ## 复现说明
 
 - 训练脚本默认面向 CUDA 环境。
@@ -165,12 +175,4 @@ python remote_scripts/eval_gsm8k_subset.py \
 ```text
 Fail2Fix-RL: Teacher-guided Failure-to-Fix Reinforcement Learning.
 Research prototype, 2026.
-```
-
-相关论文：
-
-```text
-Correction Intention Preference Optimization
-arXiv:2605.14539
-https://arxiv.org/abs/2605.14539
 ```

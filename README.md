@@ -4,7 +4,7 @@
 
 Fail2Fix-RL is a compact research framework for training small reasoning models to repair their own failed rollouts. The current implementation targets GSM8K-style verifiable math reasoning, Qwen2.5-0.5B-Instruct-scale models, and single-GPU experiments.
 
-The project is inspired by correction-oriented RLVR methods such as CIPO, but the public code is organized as a clean, runnable framework rather than a dump of one-off experiment scripts.
+The project sits in the broader line of self-improving language models, self-distillation, and verifiable reward learning. The public code is organized as a clean, runnable framework rather than a dump of one-off experiment scripts.
 
 [中文介绍](README.zh-CN.md)
 
@@ -153,6 +153,16 @@ python remote_scripts/eval_gsm8k_subset.py \
   --output-dir reports/eval_gsm8k
 ```
 
+## Related Work
+
+Fail2Fix-RL is closest to the intersection of self-generated supervision, self-correction, and verifiable reward training.
+
+**Self-generated data and self-distillation.** Self-Instruct shows that models can synthesize instruction data for later instruction tuning ([Wang et al., 2022](https://arxiv.org/abs/2212.10560)). Large Language Models Can Self-Improve uses high-confidence chain-of-thought samples from unlabeled data as self-training targets ([Huang et al., 2022](https://arxiv.org/abs/2210.11610)). STaR bootstraps reasoning by generating rationales, keeping those that lead to correct answers, and fine-tuning on them iteratively ([Zelikman et al., 2022](https://arxiv.org/abs/2203.14465)). ReST-EM generalizes this generate-filter-finetune loop to problem solving with scalar feedback ([Singh et al., 2023](https://arxiv.org/abs/2312.06585)). SPIN frames self-improvement as self-play fine-tuning against previous model generations ([Chen et al., 2024](https://arxiv.org/abs/2401.01335)). Instruction Backtranslation is another self-alignment route that creates instruction-response data from raw text ([Li et al., 2023](https://arxiv.org/abs/2308.06259)).
+
+**Self-correction and feedback-driven refinement.** Self-Refine improves outputs through iterative self-feedback at inference time without changing model weights ([Madaan et al., 2023](https://arxiv.org/abs/2303.17651)). Reflexion turns feedback into verbal memory for future attempts, especially in agentic coding and decision tasks ([Shinn et al., 2023](https://arxiv.org/abs/2303.11366)). Process-supervision work such as Let's Verify Step by Step shows why final-answer supervision can be too coarse for multi-step reasoning, and why verifier or reward-model feedback can be more informative ([Lightman et al., 2023](https://arxiv.org/abs/2305.20050)).
+
+**Failure-to-fix RL.** Fail2Fix-RL differs from pure self-training by explicitly replaying the student's own candidate solutions as correction prompts. Teacher corrections provide an initial self-correction prior, while online F2F RL keeps generating new base and correction rollouts from the current policy. Closely related correction-oriented RLVR work also studies how failed trajectories can be converted into correction supervision ([Ren et al., 2026](https://arxiv.org/abs/2605.14539)); this repository keeps that line as background while focusing on a teacher-guided F2F training recipe.
+
 ## Reproducibility Notes
 
 - Training scripts assume a CUDA environment for practical speed.
@@ -162,17 +172,9 @@ python remote_scripts/eval_gsm8k_subset.py \
 
 ## Citation
 
-If you use this project in a report or presentation, cite it as an experimental framework inspired by correction-oriented RLVR methods:
+If you use this project in a report or presentation, cite it as an experimental framework for teacher-guided self-correction and verifiable reward learning:
 
 ```text
 Fail2Fix-RL: Teacher-guided Failure-to-Fix Reinforcement Learning.
 Research prototype, 2026.
-```
-
-Related paper:
-
-```text
-Correction Intention Preference Optimization
-arXiv:2605.14539
-https://arxiv.org/abs/2605.14539
 ```
