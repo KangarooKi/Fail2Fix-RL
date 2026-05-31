@@ -47,8 +47,8 @@ def prompt_text(tokenizer, prompt):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
-    parser.add_argument("--data", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo/test.jsonl")
-    parser.add_argument("--output-dir", default="/root/autodl-tmp/learning_from_failure_exp/reports/eval_gsm8k")
+    parser.add_argument("--data", default="data/gsm8k_grpo/test.jsonl")
+    parser.add_argument("--output-dir", default="reports/eval_gsm8k")
     parser.add_argument("--limit", type=int, default=64)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--max-prompt-length", type=int, default=1024)

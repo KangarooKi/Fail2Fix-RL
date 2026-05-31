@@ -135,9 +135,9 @@ def generate_batch_groups(model, tokenizer, rows, args, device):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="/root/models")
-    parser.add_argument("--data", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo/train.jsonl")
-    parser.add_argument("--output", default="/root/autodl-tmp/learning_from_failure_exp/data/teacher_correction/student_rollouts_train.jsonl")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
+    parser.add_argument("--data", default="data/gsm8k_grpo/train.jsonl")
+    parser.add_argument("--output", default="data/teacher_correction/student_rollouts_train.jsonl")
     parser.add_argument("--limit", type=int, default=64)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--group-size", type=int, default=8)

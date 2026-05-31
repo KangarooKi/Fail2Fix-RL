@@ -102,11 +102,11 @@ class Collator:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="/root/models")
-    parser.add_argument("--data", default="/root/autodl-tmp/learning_from_failure_exp/data/teacher_correction/correction_sft_train.jsonl")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
+    parser.add_argument("--data", default="data/teacher_correction/correction_sft_train.jsonl")
     parser.add_argument("--eval-data", default="")
-    parser.add_argument("--output-dir", default="/root/autodl-tmp/learning_from_failure_exp/checkpoints/qwen25_05b_teacher_correction_sft")
-    parser.add_argument("--logging-dir", default="/root/autodl-tmp/learning_from_failure_exp/tensorboard/qwen25_05b_teacher_correction_sft")
+    parser.add_argument("--output-dir", default="checkpoints/qwen25_05b_teacher_correction_sft")
+    parser.add_argument("--logging-dir", default="runs/qwen25_05b_teacher_correction_sft")
     parser.add_argument("--max-length", type=int, default=4096)
     parser.add_argument("--epochs", type=float, default=1.0)
     parser.add_argument("--max-steps", type=int, default=-1)

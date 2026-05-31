@@ -1,13 +1,9 @@
 import argparse
-import hashlib
 import json
 import math
-import os
 import random
 import shutil
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 import torch
@@ -20,8 +16,6 @@ try:
     from torch.utils.tensorboard import SummaryWriter
 except Exception:
     SummaryWriter = None
-
-TEACHER_PROMPT_VERSION = "teacher_cipo_format_v2"
 
 
 def read_jsonl(path, limit=None, offset=0):
@@ -75,229 +69,6 @@ def correction_prompt(original_prompt, candidate_solution):
         f"{str(candidate_solution).strip()}\n\n"
         "</candidate_solution>\n"
     )
-
-
-def teacher_prompt(original_prompt, candidate_solution):
-    return (
-        "You are a careful math teacher helping a small student model recover from a failed solution.\n"
-        "Given the original problem and the student's candidate solution, identify the main mistake, then provide "
-        "a corrected concise solution.\n\n"
-        "Use exactly this output format:\n"
-        "<error>\n"
-        "One or two sentences explaining the student's main mistake.\n"
-        "</error>\n"
-        "<corrected_solution>\n"
-        "Concise corrected reasoning.\n"
-        "</corrected_solution>\n"
-        "<final_answer>the final number only</final_answer>\n"
-        "Answer: the final number only\n\n"
-        "The final line must begin with `Answer:` and contain only the final numeric answer after it. "
-        "Do not use boxed answers or the GSM8K #### marker.\n\n"
-        "<problem>\n"
-        f"{original_prompt.strip()}\n"
-        "</problem>\n\n"
-        "<student_candidate_solution>\n"
-        f"{str(candidate_solution).strip()}\n"
-        "</student_candidate_solution>"
-    )
-
-
-def teacher_cache_key(model_name, row, candidate_solution):
-    payload = json.dumps(
-        {
-            "teacher_model": model_name,
-            "prompt_version": TEACHER_PROMPT_VERSION,
-            "row_id": row["id"],
-            "prompt": row["prompt"],
-            "reference_answer": row["reference_answer"],
-            "candidate_solution": candidate_solution,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def teacher_format_ok(text):
-    text = str(text or "")
-    return bool("<final_answer>" in text.lower() and "\nAnswer:" in "\n" + text)
-
-
-def load_teacher_cache(path):
-    cache = {}
-    path = Path(path)
-    if not path.exists():
-        return cache
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            if not line.strip():
-                continue
-            try:
-                rec = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            key = rec.get("key")
-            if key:
-                cache[key] = rec
-    return cache
-
-
-def append_teacher_cache(path, rec):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-
-def call_openai_chat(api_base, api_key, model_name, messages, args):
-    url = api_base.rstrip("/") + "/chat/completions"
-    payload = {
-        "model": model_name,
-        "messages": messages,
-        "temperature": args.teacher_temperature,
-        "top_p": args.teacher_top_p,
-        "max_tokens": args.teacher_max_tokens,
-    }
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=args.teacher_timeout) as resp:
-        body = json.loads(resp.read().decode("utf-8"))
-    return body["choices"][0]["message"]["content"]
-
-
-def select_teacher_requests(scored_groups, args, rng):
-    if not args.teacher_online or args.teacher_max_calls_per_step <= 0:
-        return []
-    eligible = [g for g in scored_groups if g["pass_rate"] <= args.teacher_trigger_pass_rate]
-    eligible.sort(key=lambda g: (g["pass_rate"], g["row"]["id"]))
-    requests = []
-    for group in eligible:
-        failed = [s for s in group["samples"] if s["reward"] == 0 and s["text"].strip()]
-        if not failed:
-            continue
-        unclipped = [s for s in failed if not s["clipped"]]
-        pool = unclipped or failed
-        candidate = rng.choice(pool)
-        requests.append(
-            {
-                "row": group["row"],
-                "candidate_solution": candidate["text"],
-                "candidate_new_tokens": candidate["new_tokens"],
-                "candidate_clipped": candidate["clipped"],
-                "pass_rate": group["pass_rate"],
-            }
-        )
-        if len(requests) >= args.teacher_max_calls_per_step:
-            break
-    return requests
-
-
-def fetch_teacher_corrections(scored_groups, args, rng, cache):
-    stats = {
-        "teacher_requests": 0,
-        "teacher_cache_hits": 0,
-        "teacher_api_calls": 0,
-        "teacher_verified": 0,
-        "teacher_failed": 0,
-        "teacher_skipped_incorrect": 0,
-        "teacher_skipped_bad_format": 0,
-    }
-    if not args.teacher_online:
-        return [], stats
-    api_key = os.environ.get(args.teacher_api_key_env, "").strip()
-    if not api_key:
-        raise RuntimeError(f"--teacher-online requires ${args.teacher_api_key_env} to be set")
-
-    out = []
-    cache_path = args.teacher_cache_path
-    requests = select_teacher_requests(scored_groups, args, rng)
-    stats["teacher_requests"] = len(requests)
-    for req_rec in requests:
-        row = req_rec["row"]
-        key = teacher_cache_key(args.teacher_model, row, req_rec["candidate_solution"])
-        cached = cache.get(key)
-        if cached is not None:
-            stats["teacher_cache_hits"] += 1
-            rec = cached
-        else:
-            messages = [
-                {"role": "system", "content": "You are a precise math reasoning assistant."},
-                {"role": "user", "content": teacher_prompt(row["prompt"], req_rec["candidate_solution"])},
-            ]
-            last_error = None
-            teacher_text = ""
-            for _ in range(max(1, args.teacher_retries)):
-                try:
-                    teacher_text = call_openai_chat(args.teacher_api_base, api_key, args.teacher_model, messages, args)
-                    last_error = None
-                    break
-                except (urllib.error.URLError, TimeoutError, KeyError, json.JSONDecodeError) as exc:
-                    last_error = str(exc)
-                    time.sleep(args.teacher_retry_sleep)
-            if last_error:
-                stats["teacher_failed"] += 1
-                rec = {
-                    "key": key,
-                    "ok": False,
-                    "error": last_error[:500],
-                    "row_id": row["id"],
-                    "pass_rate": req_rec["pass_rate"],
-                    "candidate_new_tokens": req_rec["candidate_new_tokens"],
-                    "candidate_clipped": req_rec["candidate_clipped"],
-                }
-            else:
-                verdict = verify_math_response(teacher_text, row["reference_answer"])
-                rec = {
-                    "key": key,
-                    "ok": True,
-                    "verified": bool(verdict["reward"]),
-                    "format_ok": teacher_format_ok(teacher_text),
-                    "teacher_model": args.teacher_model,
-                    "row_id": row["id"],
-                    "pass_rate": req_rec["pass_rate"],
-                    "candidate_solution": req_rec["candidate_solution"],
-                    "candidate_new_tokens": req_rec["candidate_new_tokens"],
-                    "candidate_clipped": req_rec["candidate_clipped"],
-                    "teacher_response": teacher_text,
-                    "teacher_predicted_answer": verdict["predicted_answer"],
-                    "reference_answer": row["reference_answer"],
-                }
-                stats["teacher_api_calls"] += 1
-            cache[key] = rec
-            append_teacher_cache(cache_path, rec)
-
-        if rec.get("ok") and rec.get("verified") and rec.get("format_ok", True):
-            stats["teacher_verified"] += 1
-            out.append(
-                {
-                    "row": row,
-                    "candidate_solution": req_rec["candidate_solution"],
-                    "teacher_response": rec["teacher_response"],
-                    "pass_rate": req_rec["pass_rate"],
-                }
-            )
-        elif rec.get("ok") and not rec.get("format_ok", True):
-            stats["teacher_skipped_bad_format"] += 1
-        elif rec.get("ok") and args.teacher_require_correct:
-            stats["teacher_skipped_incorrect"] += 1
-        elif rec.get("ok") and not args.teacher_require_correct:
-            out.append(
-                {
-                    "row": row,
-                    "candidate_solution": req_rec["candidate_solution"],
-                    "teacher_response": rec["teacher_response"],
-                    "pass_rate": req_rec["pass_rate"],
-                }
-            )
-    return out, stats
 
 
 def tokenize_prompt(tokenizer, prompt, max_prompt_length):
@@ -515,35 +286,6 @@ def make_correction_examples(tokenizer, anchors, groups, args):
     return examples
 
 
-def make_teacher_examples(tokenizer, teacher_records, args):
-    examples = []
-    for idx, rec in enumerate(teacher_records):
-        row = rec["row"]
-        prompt = correction_prompt(row["prompt"], rec["candidate_solution"])
-        prompt_ids, _ = tokenize_prompt(tokenizer, prompt, args.max_prompt_length)
-        completion_text = str(rec["teacher_response"]).strip()
-        completion_ids = tokenizer(completion_text, add_special_tokens=False)["input_ids"]
-        if tokenizer.eos_token_id is not None:
-            completion_ids = completion_ids + [tokenizer.eos_token_id]
-        completion_ids = completion_ids[: args.teacher_sft_max_tokens]
-        if not completion_ids:
-            continue
-        examples.append(
-            {
-                "stream": "teacher_sft",
-                "group_id": f"teacher::{row['id']}::{idx}",
-                "prompt_ids": prompt_ids,
-                "completion_ids": completion_ids,
-                "response": completion_text,
-                "row_id": row["id"],
-                "pass_rate": rec["pass_rate"],
-                "new_tokens": len(completion_ids),
-                "clipped": len(completion_ids) >= args.teacher_sft_max_tokens,
-            }
-        )
-    return examples
-
-
 def add_group_advantages(examples):
     by_group = {}
     for idx, ex in enumerate(examples):
@@ -672,40 +414,6 @@ def backward_stream(model, tokenizer, examples, args, device, objective_weight):
     }
 
 
-def backward_sft(model, tokenizer, examples, args, device, objective_weight):
-    if not examples or objective_weight <= 0.0:
-        return {"loss": 0.0, "tokens": 0}
-    total_examples = len(examples)
-    loss_total = 0.0
-    token_total = 0.0
-    for start in range(0, total_examples, args.forward_batch_size):
-        batch = examples[start : start + args.forward_batch_size]
-        input_ids, attention, prompt_lens, completion_lens = pad_inputs(tokenizer, batch, device)
-        outputs = model(input_ids=input_ids, attention_mask=attention)
-        logits = outputs.logits[:, :-1, :].float()
-        target_ids = input_ids[:, 1:]
-        token_logps = F.log_softmax(logits, dim=-1).gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
-        seq_losses = []
-        tokens = 0.0
-        for i, (prompt_len, completion_len) in enumerate(zip(prompt_lens, completion_lens)):
-            sft_start = max(0, prompt_len - 1)
-            sft_end = sft_start + completion_len
-            lp = token_logps[i, sft_start:sft_end]
-            if lp.numel() == 0:
-                continue
-            seq_losses.append(-lp.mean())
-            tokens += float(lp.numel())
-        if seq_losses:
-            seq_loss = torch.stack(seq_losses)
-            loss = objective_weight * seq_loss.sum() / max(1, total_examples)
-            loss.backward()
-            with torch.no_grad():
-                loss_total += float(seq_loss.sum().detach().cpu())
-                token_total += tokens
-        del input_ids, attention, outputs, logits, target_ids, token_logps
-    return {"loss": loss_total / max(1, total_examples), "tokens": int(token_total)}
-
-
 def evaluate(model, tokenizer, rows, args, device, step, output_dir):
     if not rows:
         return None
@@ -814,14 +522,15 @@ def save_eval_checkpoint(model, tokenizer, output_dir, metrics, name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="/root/models")
-    parser.add_argument("--train-data", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo/train.jsonl")
-    parser.add_argument("--eval-data", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo/test.jsonl")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
+    parser.add_argument("--train-data", default="data/gsm8k_grpo/train.jsonl")
+    parser.add_argument("--eval-data", default="data/gsm8k_grpo/test.jsonl")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--train-limit", type=int, default=0)
     parser.add_argument("--eval-limit", type=int, default=64)
     parser.add_argument("--eval-offset", type=int, default=0)
     parser.add_argument("--max-steps", type=int, default=500)
+    parser.add_argument("--step-offset", type=int, default=0)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--group-size", type=int, default=8)
     parser.add_argument("--replay-fraction", type=float, default=1.0)
@@ -852,22 +561,6 @@ def main():
     parser.add_argument("--seed", type=int, default=20260530)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--tensorboard", action="store_true")
-    parser.add_argument("--teacher-online", action="store_true")
-    parser.add_argument("--teacher-api-base", default=os.environ.get("TEACHER_API_BASE", "https://api.openai.com/v1"))
-    parser.add_argument("--teacher-api-key-env", default="TEACHER_API_KEY")
-    parser.add_argument("--teacher-model", default=os.environ.get("TEACHER_MODEL", "teacher-model"))
-    parser.add_argument("--teacher-cache-path", default="")
-    parser.add_argument("--teacher-trigger-pass-rate", type=float, default=0.25)
-    parser.add_argument("--teacher-max-calls-per-step", type=int, default=2)
-    parser.add_argument("--teacher-max-tokens", type=int, default=1024)
-    parser.add_argument("--teacher-temperature", type=float, default=0.2)
-    parser.add_argument("--teacher-top-p", type=float, default=0.95)
-    parser.add_argument("--teacher-timeout", type=float, default=60.0)
-    parser.add_argument("--teacher-retries", type=int, default=2)
-    parser.add_argument("--teacher-retry-sleep", type=float, default=2.0)
-    parser.add_argument("--teacher-lambda", type=float, default=0.05)
-    parser.add_argument("--teacher-sft-max-tokens", type=int, default=1024)
-    parser.add_argument("--teacher-require-correct", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -877,8 +570,6 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    if args.teacher_online and not args.teacher_cache_path:
-        args.teacher_cache_path = str(output_dir / "teacher_cache.jsonl")
 
     train_rows = read_jsonl(args.train_data, args.train_limit if args.train_limit > 0 else None)
     eval_rows = read_jsonl(args.eval_data, args.eval_limit if args.eval_limit > 0 else None, args.eval_offset)
@@ -914,25 +605,23 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     writer = SummaryWriter(log_dir=str(output_dir / "runs")) if args.tensorboard and SummaryWriter else None
     rng = random.Random(args.seed)
-    teacher_cache = load_teacher_cache(args.teacher_cache_path) if args.teacher_online else {}
     rho = args.rho0
     prev_retention = None
     below_count = 0
     best_acc = -1.0
     train_log_path = output_dir / "train_history.jsonl"
     config = vars(args).copy()
-    config.update({"method": "online_cipo_grpo", "device": device, "train_count": len(train_rows), "eval_count": len(eval_rows)})
-    (output_dir / "cipo_online_config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    config.update({"method": "online_f2f_rl", "device": device, "train_count": len(train_rows), "eval_count": len(eval_rows)})
+    (output_dir / "f2f_online_config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    for step in range(1, args.max_steps + 1):
+    for local_step in range(1, args.max_steps + 1):
+        step = int(args.step_offset) + local_step
         step_started = time.time()
         batch_rows = rng.sample(train_rows, k=min(args.batch_size, len(train_rows)))
 
         base_groups = generate_groups(model, tokenizer, [r["prompt"] for r in batch_rows], args.group_size, args, device)
         scored_groups = score_base_groups(batch_rows, base_groups)
         base_examples = add_group_advantages(make_examples_from_base(scored_groups))
-        teacher_records, teacher_stats = fetch_teacher_corrections(scored_groups, args, rng, teacher_cache)
-        teacher_examples = make_teacher_examples(tokenizer, teacher_records, args)
 
         anchors, replay_stats = select_correction_anchors(scored_groups, rho, args, rng)
         correction_prompts = [correction_prompt(a["row"]["prompt"], a["candidate_solution"]) for a in anchors]
@@ -947,7 +636,6 @@ def main():
         optimizer.zero_grad(set_to_none=True)
         base_train = backward_stream(model, tokenizer, base_examples, args, device, objective_weight=1.0)
         corr_train = backward_stream(model, tokenizer, corr_examples, args, device, objective_weight=args.correction_lambda)
-        teacher_train = backward_sft(model, tokenizer, teacher_examples, args, device, objective_weight=args.teacher_lambda)
         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
         optimizer.step()
 
@@ -972,6 +660,8 @@ def main():
         corr_rewards = [ex["reward"] for ex in corr_examples]
         record = {
             "step": step,
+            "local_step": local_step,
+            "step_offset": int(args.step_offset),
             "rho": rho,
             "retention": retention,
             "success_anchor_shaped_reward_mean": (
@@ -994,20 +684,14 @@ def main():
             "replay": replay_stats,
             "base_loss": base_train["loss"],
             "correction_loss": corr_train["loss"],
-            "teacher_sft_loss": teacher_train["loss"],
             "base_kl": base_train["kl"],
             "correction_kl": corr_train["kl"],
             "base_clip_ratio": base_train["clip_ratio"],
             "correction_clip_ratio": corr_train["clip_ratio"],
             "avg_base_new_tokens": sum(ex["new_tokens"] for ex in base_examples) / max(1, len(base_examples)),
             "avg_correction_new_tokens": sum(ex["new_tokens"] for ex in corr_examples) / max(1, len(corr_examples)),
-            "avg_teacher_new_tokens": sum(ex["new_tokens"] for ex in teacher_examples) / max(1, len(teacher_examples)),
             "base_clipped_ratio": sum(int(ex["clipped"]) for ex in base_examples) / max(1, len(base_examples)),
             "correction_clipped_ratio": sum(int(ex["clipped"]) for ex in corr_examples) / max(1, len(corr_examples)),
-            "teacher_clipped_ratio": sum(int(ex["clipped"]) for ex in teacher_examples) / max(1, len(teacher_examples)),
-            "teacher_examples": len(teacher_examples),
-            "teacher_sft_tokens": teacher_train["tokens"],
-            **teacher_stats,
             "grad_norm": float(grad_norm.detach().cpu()) if hasattr(grad_norm, "detach") else float(grad_norm),
             "elapsed_sec": time.time() - step_started,
         }
@@ -1021,7 +705,7 @@ def main():
         if step % args.logging_steps == 0:
             print(json.dumps({"train": record}, ensure_ascii=False), flush=True)
 
-        if args.eval_steps > 0 and step % args.eval_steps == 0:
+        if args.eval_steps > 0 and local_step % args.eval_steps == 0:
             metrics = evaluate(model, tokenizer, eval_rows, args, device, step, output_dir)
             if metrics:
                 metrics["is_best"] = metrics["accuracy"] > best_acc

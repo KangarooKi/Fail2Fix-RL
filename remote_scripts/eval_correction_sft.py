@@ -92,7 +92,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
     parser.add_argument("--rollouts", required=True)
-    parser.add_argument("--output-dir", default="/root/autodl-tmp/learning_from_failure_exp/reports/correction_eval")
+    parser.add_argument("--output-dir", default="reports/correction_eval")
     parser.add_argument("--limit", type=int, default=64)
     parser.add_argument("--max-pass-rate", type=float, default=0.25)
     parser.add_argument("--max-prompt-length", type=int, default=2048)

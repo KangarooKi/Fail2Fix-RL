@@ -204,9 +204,9 @@ class EvalOnSaveCallback(TrainerCallback):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="/root/models")
-    parser.add_argument("--data", default="/root/autodl-tmp/learning_from_failure_exp/data/dapo_math17k_grpo/train.jsonl")
-    parser.add_argument("--output-dir", default="/root/autodl-tmp/learning_from_failure_exp/checkpoints/qwen25_05b_dapo_grpo_base_smoke")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
+    parser.add_argument("--data", default="data/gsm8k_grpo/train.jsonl")
+    parser.add_argument("--output-dir", default="checkpoints/qwen25_05b_grpo_base_smoke")
     parser.add_argument("--limit", type=int, default=512)
     parser.add_argument("--max-steps", type=int, default=20)
     parser.add_argument("--num-generations", type=int, default=4)
@@ -224,7 +224,7 @@ def main():
     parser.add_argument("--skip-final-save", action="store_true")
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument("--eval-on-save", action="store_true")
-    parser.add_argument("--eval-data", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo/test.jsonl")
+    parser.add_argument("--eval-data", default="data/gsm8k_grpo/test.jsonl")
     parser.add_argument("--eval-limit", type=int, default=64)
     parser.add_argument("--eval-offset", type=int, default=0)
     parser.add_argument("--eval-max-prompt-length", type=int, default=1024)

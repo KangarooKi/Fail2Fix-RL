@@ -47,7 +47,7 @@ def write_jsonl(path, rows):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", default="/root/autodl-tmp/learning_from_failure_exp/data/gsm8k_grpo")
+    parser.add_argument("--output-dir", default="data/gsm8k_grpo")
     parser.add_argument("--train-limit", type=int, default=0)
     parser.add_argument("--test-limit", type=int, default=0)
     args = parser.parse_args()

@@ -242,9 +242,9 @@ def build_sft_record(row, rollout, key, teacher_text, args, cached):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rollouts", required=True)
-    parser.add_argument("--output", default="/root/autodl-tmp/learning_from_failure_exp/data/teacher_correction/correction_sft_train.jsonl")
-    parser.add_argument("--cache", default="/root/autodl-tmp/learning_from_failure_exp/data/teacher_correction/teacher_cache.jsonl")
-    parser.add_argument("--env-file", default="/root/autodl-tmp/learning_from_failure_exp/.env.teacher")
+    parser.add_argument("--output", default="data/teacher_correction/correction_sft_train.jsonl")
+    parser.add_argument("--cache", default="data/teacher_correction/teacher_cache.jsonl")
+    parser.add_argument("--env-file", default=".env.teacher")
     parser.add_argument("--teacher-api-base", default="")
     parser.add_argument("--teacher-api-key-env", default="TEACHER_API_KEY")
     parser.add_argument("--teacher-model", default="")
