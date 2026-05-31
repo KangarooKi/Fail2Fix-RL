@@ -31,7 +31,13 @@ The teacher-guided stage was added because unguided self-correction is a poor co
 | --- | --- |
 | ![Unguided correction reward mean](assets/unguided_correction_reward_mean.png) | ![Unguided correction raw reward mean](assets/unguided_correction_raw_reward_mean.png) |
 
-This failure mode is intuitive for sub-billion-parameter students. Their failed rollouts are often too noisy to serve as reliable teaching material; a binary verifier says whether the final answer is right, but not how the reasoning should be repaired; and correction prompts can accidentally teach over-editing, where the model changes answers that were already correct. Teacher-guided correction SFT gives the student a minimal correction prior before online RL: how to diagnose an error, when to preserve a valid solution, how to produce a verifier-friendly final answer, and how to turn a failed attempt into a fixed trajectory. Online F2F then continues with the student's own rollouts rather than depending on the teacher at every RL step.
+After teacher-correction initialization, the pilot dynamics are qualitatively different. The base reward shows a gradual upward trend over the first 500 steps, while the correction raw reward stays mostly in a higher band despite the noise expected from online RL.
+
+| Teacher-guided base reward | Teacher-guided correction raw reward |
+| --- | --- |
+| ![Teacher-guided base reward mean](assets/teacher_guided_base_reward_mean.png) | ![Teacher-guided correction raw reward mean](assets/teacher_guided_correction_raw_reward_mean.png) |
+
+This contrast is the main motivation for the teacher-guided design. For sub-billion-parameter students, failed rollouts are often too noisy to serve as reliable teaching material; a binary verifier says whether the final answer is right, but not how the reasoning should be repaired; and correction prompts can accidentally teach over-editing, where the model changes answers that were already correct. Teacher-guided correction SFT gives the student a minimal correction prior before online RL: how to diagnose an error, when to preserve a valid solution, how to produce a verifier-friendly final answer, and how to turn a failed attempt into a fixed trajectory. Online F2F then continues with the student's own rollouts rather than depending on the teacher at every RL step.
 
 ## Core Method
 
