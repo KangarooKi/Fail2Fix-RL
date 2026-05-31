@@ -39,6 +39,22 @@ After teacher-correction initialization, the pilot dynamics are qualitatively di
 
 This contrast is the main motivation for the teacher-guided design. For sub-billion-parameter students, failed rollouts are often too noisy to serve as reliable teaching material; a binary verifier says whether the final answer is right, but not how the reasoning should be repaired; and correction prompts can accidentally teach over-editing, where the model changes answers that were already correct. Teacher-guided correction SFT gives the student a minimal correction prior before online RL: how to diagnose an error, when to preserve a valid solution, how to produce a verifier-friendly final answer, and how to turn a failed attempt into a fixed trajectory. Online F2F then continues with the student's own rollouts rather than depending on the teacher at every RL step.
 
+## Pilot Results
+
+![Teacher-guided F2F eval summary](assets/f2f_eval_summary.png)
+
+On GSM8K eval, the best observed pilot accuracy was 36.5% for the base model, 47.0% for GRPO, 48.0% for unguided F2F, and 50.0% for Teacher-Guided F2F. The same runs also show why the best-number comparison is not the whole story: unguided F2F briefly improves but later collapses to 39.5%, while Teacher-Guided F2F keeps the best eval score in this pilot comparison.
+
+## Released Teacher-Correction Data
+
+The Mimo-generated correction dataset used for teacher-guided initialization is included in:
+
+```text
+released_data/mimo_teacher_corrections_gsm8k/
+```
+
+It contains 3,676 verified correction SFT examples generated from GSM8K student failures with `mimo-v2.5-pro`. Each row includes the original question, failed student solution, structured teacher diagnosis, and the verified correction target. For ordinary SFT, use the `prompt` and `response` fields.
+
 ## Core Method
 
 Each online RL step uses two streams:
@@ -73,6 +89,10 @@ This repository keeps only reusable framework code: data preparation, rollout co
 ```text
 assets/
   f2f_framework.png                 Framework diagram.
+  f2f_eval_summary.png              Pilot eval summary figure.
+
+released_data/
+  mimo_teacher_corrections_gsm8k/   Verified Mimo correction SFT data.
 
 remote_scripts/
   prepare_gsm8k_grpo_data.py        Convert ModelScope GSM8K into RL JSONL.
