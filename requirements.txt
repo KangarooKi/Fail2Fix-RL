@@ -1,0 +1,12 @@
+accelerate
+datasets
+matplotlib
+modelscope
+numpy
+pandas
+sympy
+tensorboard
+torch
+tqdm
+transformers
+

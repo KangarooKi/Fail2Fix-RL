@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+/data/
+/datasets/
+/checkpoints/
+/logs/
+/runs/
+/tensorboard/
+/wandb/
+/outputs/
+/tmp/
+
+# Draft notes and experiment result artifacts are kept local by default.
+/reports/
+/experiment_notes/
+/learning_from_failure_*review.md
+/learning_from_failure_*plan.md
+/qwen25_05b_full_sft_preexp_review.md
+/cipo_ppt_illustrative_*.csv
+/cipo_ppt_illustrative_*.md
+/cipo_gsm8k_preexp_log.md
+/project_intro_cn.md
+/GITHUB_REPO_DRAFT.md
+
+# Large model artifacts
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+
+# Generated caches
+*.u64idx
+*.cache
+*.log
