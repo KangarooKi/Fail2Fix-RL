@@ -30,7 +30,6 @@
   "avg_student_new_tokens": 214.874,
   "fields": [
     "cached",
-    "created_at",
     "id",
     "idx",
     "key",
